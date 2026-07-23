@@ -1,0 +1,22 @@
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: together-journey-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-together_journey}
+      POSTGRES_USER: ${POSTGRES_USER:-journey}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-journey-local}
+    ports:
+      - "5432:5432"
+    volumes:
+      - journey-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-journey} -d ${POSTGRES_DB:-together_journey}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  journey-postgres:
+
