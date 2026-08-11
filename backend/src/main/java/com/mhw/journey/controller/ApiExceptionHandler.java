@@ -1,10 +1,12 @@
 package com.mhw.journey.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collections;
 import java.util.Map;
@@ -26,5 +28,9 @@ public class ApiExceptionHandler {
                 : exception.getBindingResult().getFieldErrors().get(0).getField() + " 填写不正确";
         return Collections.singletonMap("message", message);
     }
-}
 
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> handleStatus(ResponseStatusException exception) {
+        return ResponseEntity.status(exception.getStatus()).body(Collections.singletonMap("message", exception.getReason()));
+    }
+}

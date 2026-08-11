@@ -42,6 +42,11 @@ public class MemoryService {
         memory.setNote(incoming.getNote());
         memory.setTags(incoming.getTags());
         memory.setEmoji(incoming.getEmoji());
+        memory.setCategory(incoming.getCategory());
+        memory.setSpecialty(incoming.getSpecialty());
+        memory.setPlaceId(incoming.getPlaceId());
+        memory.setProvince(incoming.getProvince());
+        memory.setDistrict(incoming.getDistrict());
         memory.setLatitude(incoming.getLatitude());
         memory.setLongitude(incoming.getLongitude());
         return repository.save(memory);
@@ -89,5 +94,8 @@ public class MemoryService {
                 .limit(3)
                 .collect(Collectors.toList());
     }
-}
 
+    public List<Memory> findMilkTea() {
+        return repository.findByCategoryIgnoreCaseOrderByVisitedAtDesc("MILK_TEA");
+    }
+}

@@ -8,6 +8,6 @@ import java.util.List;
 
 public interface MemoryRepository extends JpaRepository<Memory, Long> {
     List<Memory> findAllByOrderByVisitedAtDesc();
+    List<Memory> findByCategoryIgnoreCaseOrderByVisitedAtDesc(String category);
     long countByType(MemoryType type);
 }
-

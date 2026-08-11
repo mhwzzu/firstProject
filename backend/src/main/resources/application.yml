@@ -1,5 +1,18 @@
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+
+app:
+  auth:
+    username: ${APP_USERNAME:mhwzzu}
+    password: ${APP_PASSWORD:change-me-now}
+
+amap:
+  key: ${AMAP_KEY:}
 
 spring:
   datasource:
@@ -27,4 +40,3 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-

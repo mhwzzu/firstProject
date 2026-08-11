@@ -12,7 +12,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = {"http://localhost:5173"})
 public class MemoryController {
     private final MemoryService service;
 
@@ -23,6 +22,11 @@ public class MemoryController {
     @GetMapping("/memories")
     public List<Memory> memories() {
         return service.findAll();
+    }
+
+    @GetMapping("/memories/milk-tea")
+    public List<Memory> milkTea() {
+        return service.findMilkTea();
     }
 
     @PostMapping("/memories")
@@ -52,4 +56,3 @@ public class MemoryController {
         return service.recommend();
     }
 }
-

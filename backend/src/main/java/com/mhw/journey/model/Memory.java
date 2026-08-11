@@ -42,6 +42,11 @@ public class Memory {
 
     private String tags;
     private String emoji;
+    private String category;
+    private String specialty;
+    private String placeId;
+    private String province;
+    private String district;
     private Double latitude;
     private Double longitude;
 
@@ -65,9 +70,18 @@ public class Memory {
     public void setTags(String tags) { this.tags = tags; }
     public String getEmoji() { return emoji; }
     public void setEmoji(String emoji) { this.emoji = emoji; }
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
+    public String getSpecialty() { return specialty; }
+    public void setSpecialty(String specialty) { this.specialty = specialty; }
+    public String getPlaceId() { return placeId; }
+    public void setPlaceId(String placeId) { this.placeId = placeId; }
+    public String getProvince() { return province; }
+    public void setProvince(String province) { this.province = province; }
+    public String getDistrict() { return district; }
+    public void setDistrict(String district) { this.district = district; }
     public Double getLatitude() { return latitude; }
     public void setLatitude(Double latitude) { this.latitude = latitude; }
     public Double getLongitude() { return longitude; }
     public void setLongitude(Double longitude) { this.longitude = longitude; }
 }
-
