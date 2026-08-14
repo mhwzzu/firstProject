@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-together_journey}
       POSTGRES_USER: ${POSTGRES_USER:-journey}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-journey-local}
-    ports:
-      - "5432:5432"
     volumes:
       - journey-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -16,7 +14,49 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    mem_limit: 384m
+    networks:
+      - journey-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: together-journey-api
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      DB_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-together_journey}
+      DB_USERNAME: ${POSTGRES_USER:-journey}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-journey-local}
+      APP_USERNAME: ${APP_USERNAME:-mhwzzu}
+      APP_PASSWORD: ${APP_PASSWORD:-change-me-now}
+      AMAP_KEY: ${AMAP_KEY:-}
+      JAVA_OPTS: "-Xmx256m -Xms128m"
+    mem_limit: 512m
+    networks:
+      - journey-net
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: together-journey-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    mem_limit: 128m
+    networks:
+      - journey-net
 
 volumes:
   journey-postgres:
 
+networks:
+  journey-net:
+    driver: bridge
