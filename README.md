@@ -79,3 +79,13 @@ npm run build
 - H2 模式的数据在后端重启后恢复为示例数据。
 - PostgreSQL 模式的数据保存在 Docker volume `journey-postgres` 中。
 - 正式部署前请复制 `.env.example` 为 `.env` 并修改数据库密码、登录密码和 `AMAP_KEY`，不要提交 `.env`。
+
+## 阿里云部署
+
+项目已包含生产 Docker 配置：
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+完整步骤见 [docs/deploy-aliyun.md](docs/deploy-aliyun.md)。
