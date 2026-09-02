@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface MemoryRepository extends JpaRepository<Memory, Long> {
-    List<Memory> findAllByOrderByVisitedAtDesc();
-    List<Memory> findByCategoryIgnoreCaseOrderByVisitedAtDesc(String category);
-    long countByType(MemoryType type);
+    List<Memory> findAllBySpaceIdOrderByVisitedAtDesc(Long spaceId);
+    List<Memory> findBySpaceIdAndCategoryIgnoreCaseOrderByVisitedAtDesc(Long spaceId, String category);
+    long countBySpaceIdAndType(Long spaceId, MemoryType type);
 }

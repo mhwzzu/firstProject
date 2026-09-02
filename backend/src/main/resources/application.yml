@@ -5,11 +5,7 @@ server:
       cookie:
         http-only: true
         same-site: lax
-
-app:
-  auth:
-    username: ${APP_USERNAME:mhwzzu}
-    password: ${APP_PASSWORD:change-me-now}
+        secure: ${APP_SECURE_COOKIE:false}
 
 amap:
   key: ${AMAP_KEY:}
@@ -22,7 +18,7 @@ spring:
     driver-class-name: org.h2.Driver
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     open-in-view: false
   jackson:
     time-zone: Asia/Shanghai

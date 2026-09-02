@@ -15,13 +15,13 @@ public class AuthInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String path = request.getRequestURI();
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())
-                || path.startsWith("/api/auth/")
+                || path.startsWith("/api/v1/auth/")
                 || path.equals("/api/health")) {
             return true;
         }
 
         HttpSession session = request.getSession(false);
-        if (session != null && session.getAttribute(SESSION_USER) != null) {
+        if (session != null && session.getAttribute(SESSION_USER) instanceof Long) {
             return true;
         }
 

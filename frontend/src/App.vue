@@ -1,607 +1,205 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 
-const memories = ref([])
-const recommendations = ref([])
-const summary = reactive({ totalMemories: 0, restaurantCount: 0, tripCount: 0, cityCount: 0 })
-const activeView = ref('home')
+const me = ref(null)
+const space = ref(null)
+const preference = ref(null)
+const today = ref(null)
+const weekend = ref(null)
+const plans = ref([])
+const activeTab = ref('discover')
+const authMode = ref('login')
 const loading = ref(true)
-const authChecked = ref(false)
-const currentUser = ref(null)
-const errorMessage = ref('')
-const modalOpen = ref(false)
-const saving = ref(false)
-const editingId = ref(null)
+const submitting = ref(false)
+const error = ref('')
 const toast = ref('')
-const placeResults = ref([])
-const placeSearching = ref(false)
-const placeMessage = ref('')
-const placeKeyword = ref('')
-const loginLoading = ref(false)
-const loginError = ref('')
+const inviteToken = ref('')
+const setupMode = ref('create')
 
-const loginForm = reactive({
-  username: 'mhwzzu',
-  password: ''
-})
+const authForm = reactive({ email: '', displayName: '', password: '' })
+const spaceForm = reactive({ name: '我们的小宇宙', city: '杭州', token: '' })
+const preferenceForm = reactive({ city: '杭州', budget: 150, travelRadiusKm: 12, foodTags: '咖啡,川菜', activityTags: '展览,散步', travelTags: '海边,慢旅行' })
 
-const categoryOptions = [
-  { value: 'FOOD', label: '美食', emoji: '🍜' },
-  { value: 'MILK_TEA', label: '奶茶', emoji: '🧋' },
-  { value: 'COFFEE', label: '咖啡', emoji: '☕' },
-  { value: 'DESSERT', label: '甜品', emoji: '🍰' },
-  { value: 'TRIP', label: '旅行', emoji: '🧳' },
-  { value: 'OTHER', label: '其他', emoji: '✨' }
-]
+const isSetup = computed(() => me.value && !space.value)
+const needsPreferences = computed(() => space.value && preference.value && !preference.value.onboardingComplete)
+const city = computed(() => preference.value?.city || space.value?.defaultCity || '杭州')
 
-const emptyForm = () => ({
-  title: '',
-  type: 'RESTAURANT',
-  city: '',
-  address: '',
-  visitedAt: new Date().toISOString().slice(0, 10),
-  rating: 5,
-  note: '',
-  tags: '',
-  emoji: '🍜',
-  category: 'FOOD',
-  specialty: '',
-  placeId: '',
-  province: '',
-  district: '',
-  latitude: null,
-  longitude: null
-})
-const form = reactive(emptyForm())
-
-const navItems = [
-  { id: 'home', label: '漫游首页' },
-  { id: 'restaurants', label: '吃喝地图' },
-  { id: 'milkTea', label: '奶茶地图' },
-  { id: 'trips', label: '旅行足迹' },
-  { id: 'recommendations', label: '下一站' }
-]
-
-const filteredMemories = computed(() => {
-  if (activeView.value === 'restaurants') return memories.value.filter(item => item.type === 'RESTAURANT')
-  if (activeView.value === 'trips') return memories.value.filter(item => item.type === 'TRIP')
-  return memories.value
-})
-
-const milkTeaMemories = computed(() => memories.value.filter(item => item.category === 'MILK_TEA'))
-
-const milkTeaCities = computed(() => {
-  const groups = new Map()
-  milkTeaMemories.value.forEach(item => {
-    const key = item.city || '未标记城市'
-    if (!groups.has(key)) {
-      groups.set(key, {
-        city: key,
-        province: item.province || '',
-        count: 0,
-        memories: [],
-        latitude: item.latitude,
-        longitude: item.longitude
-      })
-    }
-    const group = groups.get(key)
-    group.count += 1
-    group.memories.push(item)
-  })
-  return Array.from(groups.values())
-})
-
-const pageTitle = computed(() => ({
-  restaurants: '一起吃过喝过的店',
-  milkTea: '她的奶茶地图',
-  trips: '走过的地方',
-  recommendations: '下一站，去哪里？'
-}[activeView.value] || '把平常的日子，过成值得收藏的故事'))
-
-const formatDate = date => new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric', month: 'short', day: 'numeric'
-}).format(new Date(`${date}T00:00:00`))
-
-const categoryLabel = value => categoryOptions.find(item => item.value === value)?.label || '未分类'
-const categoryEmoji = value => categoryOptions.find(item => item.value === value)?.emoji || '✨'
-const hasLocation = item => Number(item?.latitude) && Number(item?.longitude)
-const amapUrl = item => hasLocation(item)
-  ? `https://uri.amap.com/marker?position=${item.longitude},${item.latitude}&name=${encodeURIComponent(item.title || item.address || item.city)}`
-  : ''
-
-const fetchJson = async (url, options = {}) => {
-  const response = await fetch(url, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      ...(options.headers || {})
-    }
-  })
-  if (response.status === 401) {
-    currentUser.value = null
-  }
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}))
-    throw new Error(body.message || '请求没有成功，请稍后再试')
-  }
-  return response.status === 204 ? null : response.json()
+const api = async (url, options = {}) => {
+  const response = await fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(body.message || '操作没有成功，请稍后重试')
+  return body
 }
 
-const loadData = async () => {
+const showToast = message => {
+  toast.value = message
+  window.setTimeout(() => { toast.value = '' }, 2600)
+}
+
+const loadWorkspace = async () => {
+  try {
+    space.value = await api('/api/v1/spaces/current')
+  } catch (e) {
+    if (e.message.includes('创建或加入')) { space.value = null; preference.value = null; return }
+    throw e
+  }
+  preference.value = await api('/api/v1/preferences')
+  Object.assign(preferenceForm, preference.value)
+  if (preference.value.onboardingComplete) await refreshRecommendations()
+  plans.value = await api('/api/v1/plans')
+}
+
+const refreshRecommendations = async () => {
+  const query = `?city=${encodeURIComponent(city.value)}`
+  const [todayData, weekendData] = await Promise.all([
+    api(`/api/v1/recommendations/today${query}`),
+    api(`/api/v1/recommendations/weekend${query}`)
+  ])
+  today.value = todayData
+  weekend.value = weekendData
+}
+
+const bootstrap = async () => {
   loading.value = true
-  errorMessage.value = ''
+  error.value = ''
   try {
-    const [memoryData, summaryData, destinationData] = await Promise.all([
-      fetchJson('/api/memories'),
-      fetchJson('/api/summary'),
-      fetchJson('/api/recommendations')
-    ])
-    memories.value = memoryData
-    Object.assign(summary, summaryData)
-    recommendations.value = destinationData
-  } catch (error) {
-    errorMessage.value = error.message
+    const user = await api('/api/v1/auth/me')
+    me.value = user.authenticated ? user : null
+    if (me.value) await loadWorkspace()
+  } catch (e) {
+    error.value = e.message
   } finally {
     loading.value = false
   }
 }
 
-const loadAuth = async () => {
+const submitAuth = async () => {
+  submitting.value = true; error.value = ''
   try {
-    const me = await fetchJson('/api/auth/me')
-    currentUser.value = me?.username || null
-    if (currentUser.value) {
-      await loadData()
+    const url = authMode.value === 'register' ? '/api/v1/auth/register' : '/api/v1/auth/login'
+    const payload = authMode.value === 'register' ? authForm : { email: authForm.email, password: authForm.password }
+    me.value = await api(url, { method: 'POST', body: JSON.stringify(payload) })
+    await loadWorkspace()
+    showToast(authMode.value === 'register' ? '账户已创建，先建立你们的空间吧' : '欢迎回来')
+  } catch (e) { error.value = e.message } finally { submitting.value = false }
+}
+
+const createOrJoinSpace = async () => {
+  submitting.value = true; error.value = ''
+  try {
+    if (setupMode.value === 'create') {
+      space.value = await api('/api/v1/spaces', { method: 'POST', body: JSON.stringify({ name: spaceForm.name, city: spaceForm.city }) })
+      showToast('空间已建立，现在设置你的偏好')
     } else {
-      loading.value = false
+      space.value = await api('/api/v1/spaces/join', { method: 'POST', body: JSON.stringify({ token: spaceForm.token }) })
+      showToast('已加入你们的空间')
     }
-  } catch (error) {
-    loading.value = false
-  } finally {
-    authChecked.value = true
-  }
+    preference.value = await api('/api/v1/preferences')
+    Object.assign(preferenceForm, preference.value)
+  } catch (e) { error.value = e.message } finally { submitting.value = false }
 }
 
-const login = async () => {
-  loginLoading.value = true
-  loginError.value = ''
+const savePreferences = async () => {
+  submitting.value = true; error.value = ''
   try {
-    const user = await fetchJson('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(loginForm)
-    })
-    currentUser.value = user.username
-    toast.value = '欢迎回来，纪念册已解锁'
-    setTimeout(() => { toast.value = '' }, 2200)
-    await loadData()
-  } catch (error) {
-    loginError.value = error.message
-  } finally {
-    loginLoading.value = false
-  }
+    const payload = {
+      city: preferenceForm.city,
+      budget: preferenceForm.budget,
+      travelRadiusKm: preferenceForm.travelRadiusKm,
+      foodTags: preferenceForm.foodTags,
+      activityTags: preferenceForm.activityTags,
+      travelTags: preferenceForm.travelTags
+    }
+    preference.value = await api('/api/v1/preferences', { method: 'PUT', body: JSON.stringify(payload) })
+    await refreshRecommendations()
+    showToast('偏好已保存，推荐已为你们更新')
+  } catch (e) { error.value = e.message } finally { submitting.value = false }
+}
+
+const createInvite = async () => {
+  try {
+    const invite = await api('/api/v1/spaces/current/invites', { method: 'POST' })
+    inviteToken.value = invite.token
+    if (navigator.clipboard) await navigator.clipboard.writeText(invite.token).catch(() => null)
+    showToast('邀请口令已复制，发给另一位成员即可')
+  } catch (e) { error.value = e.message }
+}
+
+const feedback = async (candidate, action) => {
+  try {
+    await api(`/api/v1/candidates/${candidate.id}/feedback`, { method: 'POST', body: JSON.stringify({ action }) })
+    showToast(action === 'WANT' ? '已记下：你想去这里' : action === 'SKIP' ? '已降低类似推荐的频率' : '已投票，等待对方的选择')
+  } catch (e) { error.value = e.message }
+}
+
+const addPlan = async candidate => {
+  try {
+    await api('/api/v1/plans', { method: 'POST', body: JSON.stringify({ candidateId: candidate.id, budget: preference.value?.budget, note: '' }) })
+    plans.value = await api('/api/v1/plans')
+    activeTab.value = 'plans'
+    showToast('已加入共同计划')
+  } catch (e) { error.value = e.message }
+}
+
+const completePlan = async plan => {
+  try {
+    await api(`/api/v1/plans/${plan.id}/complete`, { method: 'POST' })
+    plans.value = await api('/api/v1/plans')
+    showToast('计划已沉淀成一段共同回忆')
+  } catch (e) { error.value = e.message }
 }
 
 const logout = async () => {
-  await fetchJson('/api/auth/logout', { method: 'POST' }).catch(() => null)
-  currentUser.value = null
-  memories.value = []
-  activeView.value = 'home'
+  await api('/api/v1/auth/logout', { method: 'POST' }).catch(() => null)
+  me.value = null; space.value = null; preference.value = null; today.value = null; weekend.value = null; plans.value = []; activeTab.value = 'discover'
 }
 
-const resetPlaceSearch = () => {
-  placeResults.value = []
-  placeMessage.value = ''
-  placeKeyword.value = ''
-}
-
-const openCreate = (type = 'RESTAURANT') => {
-  editingId.value = null
-  Object.assign(form, emptyForm())
-  setType(type)
-  if (activeView.value === 'milkTea') {
-    form.category = 'MILK_TEA'
-    form.emoji = '🧋'
-  }
-  resetPlaceSearch()
-  modalOpen.value = true
-}
-
-const openEdit = memory => {
-  editingId.value = memory.id
-  Object.assign(form, emptyForm(), memory)
-  resetPlaceSearch()
-  modalOpen.value = true
-}
-
-const setType = type => {
-  form.type = type
-  if (type === 'TRIP') {
-    form.category = 'TRIP'
-    form.emoji = '🧳'
-  } else if (form.category === 'TRIP') {
-    form.category = 'FOOD'
-    form.emoji = '🍜'
-  } else {
-    form.emoji = categoryEmoji(form.category)
-  }
-}
-
-const setCategory = category => {
-  form.category = category
-  form.emoji = categoryEmoji(category)
-  if (category === 'TRIP') {
-    form.type = 'TRIP'
-  } else {
-    form.type = 'RESTAURANT'
-  }
-}
-
-const searchPlaces = async () => {
-  if (!placeKeyword.value.trim()) {
-    placeMessage.value = '先输入店名、景点或地址'
-    return
-  }
-  placeSearching.value = true
-  placeMessage.value = ''
-  try {
-    const params = new URLSearchParams({
-      keywords: placeKeyword.value.trim(),
-      city: form.city || ''
-    })
-    const results = await fetchJson(`/api/places/search?${params.toString()}`)
-    placeResults.value = results
-    if (results.length === 0) {
-      placeMessage.value = '没有搜到结果；如果还没配置 AMAP_KEY，可以先手动填写地址和坐标。'
-    }
-  } catch (error) {
-    placeMessage.value = error.message
-  } finally {
-    placeSearching.value = false
-  }
-}
-
-const selectPlace = place => {
-  form.placeId = place.id
-  form.title = form.title || place.name
-  form.province = place.province
-  form.city = place.city || form.city
-  form.district = place.district
-  form.address = [place.district, place.address].filter(Boolean).join(' ')
-  form.latitude = place.latitude || null
-  form.longitude = place.longitude || null
-  placeMessage.value = `已选中：${place.name}`
-}
-
-const saveMemory = async () => {
-  saving.value = true
-  try {
-    const url = editingId.value ? `/api/memories/${editingId.value}` : '/api/memories'
-    await fetchJson(url, {
-      method: editingId.value ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, rating: Number(form.rating) })
-    })
-    modalOpen.value = false
-    toast.value = editingId.value ? '这段回忆已经更新' : '新的回忆已经收进漫游簿'
-    setTimeout(() => { toast.value = '' }, 2600)
-    await loadData()
-  } catch (error) {
-    errorMessage.value = error.message
-  } finally {
-    saving.value = false
-  }
-}
-
-const deleteMemory = async memory => {
-  if (!window.confirm(`确定删除“${memory.title}”吗？`)) return
-  try {
-    await fetchJson(`/api/memories/${memory.id}`, { method: 'DELETE' })
-    toast.value = '这条记录已删除'
-    setTimeout(() => { toast.value = '' }, 2200)
-    await loadData()
-  } catch (error) {
-    errorMessage.value = error.message
-  }
-}
-
-onMounted(loadAuth)
+onMounted(bootstrap)
 </script>
 
 <template>
-  <div v-if="!authChecked" class="boot-screen">正在打开你们的纪念册...</div>
+  <main class="page-shell">
+    <section v-if="loading" class="centered-card"><span class="pulse-dot"></span><p>正在整理你们下一次出发的灵感…</p></section>
 
-  <div v-else-if="!currentUser" class="login-screen">
-    <form class="login-card" @submit.prevent="login">
-      <span class="brand-mark">∴</span>
-      <p class="eyebrow">PRIVATE JOURNEY</p>
-      <h1>两个人的漫游簿</h1>
-      <p>输入账号密码后，才能查看你们吃喝玩乐和旅行足迹。</p>
-      <label>账号<input v-model.trim="loginForm.username" autocomplete="username" required></label>
-      <label>密码<input v-model="loginForm.password" type="password" autocomplete="current-password" required placeholder="默认 change-me-now"></label>
-      <div v-if="loginError" class="inline-error">{{ loginError }}</div>
-      <button class="primary submit-button" :disabled="loginLoading">{{ loginLoading ? '正在解锁...' : '进入纪念册' }}</button>
-    </form>
-  </div>
-
-  <div v-else class="app-shell">
-    <header class="topbar">
-      <button class="brand" aria-label="返回漫游首页" @click="activeView = 'home'">
-        <span class="brand-mark">∴</span>
-        <span>
-          <strong>两个人的漫游簿</strong>
-          <small>Together, everywhere.</small>
-        </span>
-      </button>
-      <nav aria-label="主要导航">
-        <button
-          v-for="item in navItems"
-          :key="item.id"
-          :class="{ active: activeView === item.id }"
-          @click="activeView = item.id"
-        >
-          {{ item.label }}
-        </button>
-      </nav>
-      <div class="top-actions">
-        <button class="add-button" @click="openCreate(activeView === 'trips' ? 'TRIP' : 'RESTAURANT')">
-          <span>＋</span> 记一笔
-        </button>
-        <button class="logout-button" @click="logout">退出</button>
-      </div>
-    </header>
-
-    <main>
-      <section v-if="activeView === 'home'" class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">OUR LITTLE JOURNEY · 从第一次出发开始</p>
-          <h1>把平常的日子，<br><em>过成值得收藏的故事。</em></h1>
-          <p class="hero-description">
-            记下每一家舍不得忘记的小店、每一条牵手走过的街，也把她喜欢的奶茶单独点亮成地图。
-          </p>
-          <div class="hero-actions">
-            <button class="primary" @click="openCreate('RESTAURANT')">记录今天 <span>→</span></button>
-            <button class="text-button" @click="activeView = 'milkTea'">翻她的奶茶地图 <span>→</span></button>
-          </div>
-        </div>
-        <div class="memory-collage" aria-label="共同旅行回忆拼贴">
-          <div class="postcard postcard-main">
-            <div class="scene scene-lake"><span>☀</span><i></i></div>
-            <div class="postcard-caption">
-              <strong>杭州 · 西湖</strong>
-              <span>2025.04.19</span>
-            </div>
-            <p>“那天的晚风，刚好也喜欢我们。”</p>
-          </div>
-          <div class="ticket">
-            <span>ADMIT TWO</span>
-            <strong>一起去更远的地方</strong>
-            <small>NO. 0520</small>
-          </div>
-          <div class="round-stamp">LOVE<br>TRIP</div>
-          <span class="tape tape-one"></span>
-          <span class="tape tape-two"></span>
-        </div>
-      </section>
-
-      <section v-if="activeView === 'home'" class="stats" aria-label="共同回忆统计">
-        <article>
-          <span class="stat-icon peach">♡</span>
-          <div><strong>{{ summary.totalMemories }}</strong><small>段共同回忆</small></div>
-        </article>
-        <article>
-          <span class="stat-icon yellow">⌁</span>
-          <div><strong>{{ summary.restaurantCount }}</strong><small>家好吃好喝</small></div>
-        </article>
-        <article>
-          <span class="stat-icon green">⌖</span>
-          <div><strong>{{ summary.cityCount }}</strong><small>座点亮城市</small></div>
-        </article>
-        <article class="next-stat" @click="activeView = 'recommendations'">
-          <div><small>下一次出发</small><strong>等我们决定</strong></div><span>→</span>
-        </article>
-      </section>
-
-      <section v-if="activeView === 'milkTea'" class="milk-tea-section">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">MILK TEA ATLAS</p>
-            <h2>{{ pageTitle }}</h2>
-          </div>
-          <button class="primary compact" @click="openCreate('RESTAURANT')">新增奶茶</button>
-        </div>
-        <div class="tea-map">
-          <div class="tea-map-panel">
-            <span>🧋</span>
-            <strong>{{ milkTeaCities.length }}</strong>
-            <small>座城市已经喝过奶茶</small>
-          </div>
-          <article v-for="city in milkTeaCities" :key="city.city" class="tea-city">
-            <div>
-              <p>{{ city.province || '已点亮' }}</p>
-              <h3>{{ city.city }}</h3>
-              <small>{{ city.count }} 杯 / 店</small>
-            </div>
-            <a v-if="hasLocation(city)" :href="amapUrl(city)" target="_blank" rel="noreferrer">看地图</a>
-          </article>
-        </div>
-        <div v-if="milkTeaMemories.length === 0" class="state-card">还没有奶茶记录，下一杯就从今天开始。</div>
-        <div v-else class="memory-grid tea-grid">
-          <article v-for="memory in milkTeaMemories" :key="memory.id" class="memory-card">
-            <div class="memory-visual milk">
-              <span class="memory-emoji">🧋</span>
-              <span class="type-chip">{{ memory.city }} · {{ memory.specialty || '奶茶' }}</span>
-              <div class="visual-landscape"><i></i><b></b></div>
-            </div>
-            <div class="memory-body">
-              <div class="memory-meta">
-                <span>{{ memory.province }} {{ memory.district }}</span>
-                <span>{{ '★'.repeat(memory.rating || 0) }}</span>
-              </div>
-              <h3>{{ memory.title }}</h3>
-              <p>{{ memory.note }}</p>
-              <div class="tag-row">
-                <span v-for="tag in (memory.tags || '').split(',').filter(Boolean)" :key="tag"># {{ tag.trim() }}</span>
-              </div>
-              <footer>
-                <time>{{ formatDate(memory.visitedAt) }}</time>
-                <div>
-                  <a v-if="hasLocation(memory)" :href="amapUrl(memory)" target="_blank" rel="noreferrer">地图</a>
-                  <button @click="openEdit(memory)">编辑</button>
-                  <button @click="deleteMemory(memory)">删除</button>
-                </div>
-              </footer>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section v-else-if="activeView !== 'recommendations'" class="content-section">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">{{ activeView === 'home' ? 'RECENT STORIES' : 'OUR COLLECTION' }}</p>
-            <h2>{{ activeView === 'home' ? '最近收藏的故事' : pageTitle }}</h2>
-          </div>
-          <button v-if="activeView === 'home'" class="text-button" @click="activeView = 'trips'">查看全部 <span>→</span></button>
-        </div>
-
-        <div v-if="loading" class="state-card">正在翻开漫游簿...</div>
-        <div v-else-if="errorMessage" class="state-card error">
-          {{ errorMessage }} <button @click="loadData">重新加载</button>
-        </div>
-        <div v-else-if="filteredMemories.length === 0" class="state-card">
-          这里还没有记录。下一段故事，就从今天开始吧。
-        </div>
-        <div v-else class="memory-grid">
-          <article
-            v-for="memory in (activeView === 'home' ? filteredMemories.slice(0, 3) : filteredMemories)"
-            :key="memory.id"
-            class="memory-card"
-          >
-            <div class="memory-visual" :class="memory.type.toLowerCase()">
-              <span class="memory-emoji">{{ memory.emoji }}</span>
-              <span class="type-chip">{{ memory.type === 'RESTAURANT' ? categoryLabel(memory.category) : '一起走过' }}</span>
-              <div class="visual-landscape"><i></i><b></b></div>
-            </div>
-            <div class="memory-body">
-              <div class="memory-meta">
-                <span>{{ memory.city }} · {{ memory.address }}</span>
-                <span>{{ '★'.repeat(memory.rating || 0) }}</span>
-              </div>
-              <h3>{{ memory.title }}</h3>
-              <p>{{ memory.note }}</p>
-              <div class="tag-row">
-                <span v-for="tag in (memory.tags || '').split(',').filter(Boolean)" :key="tag"># {{ tag.trim() }}</span>
-              </div>
-              <footer>
-                <time>{{ formatDate(memory.visitedAt) }}</time>
-                <div>
-                  <a v-if="hasLocation(memory)" :href="amapUrl(memory)" target="_blank" rel="noreferrer">地图</a>
-                  <button @click="openEdit(memory)">编辑</button>
-                  <button @click="deleteMemory(memory)">删除</button>
-                </div>
-              </footer>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section v-else class="recommendation-section">
-        <div class="recommendation-intro">
-          <p class="eyebrow">THE NEXT CHAPTER</p>
-          <h1>{{ pageTitle }}</h1>
-          <p>根据你们喜欢的慢旅行、美食和奶茶城市，漫游簿挑出了三个还没点亮的目的地。</p>
-        </div>
-        <div class="destination-grid">
-          <article v-for="(destination, index) in recommendations" :key="destination.city">
-            <div class="destination-number">0{{ index + 1 }}</div>
-            <span class="destination-emoji">{{ destination.emoji }}</span>
-            <p>{{ destination.province }}</p>
-            <h2>{{ destination.city }}</h2>
-            <div class="match"><span :style="{ width: destination.matchScore + '%' }"></span></div>
-            <small>{{ destination.matchScore }}% 契合你们的偏好</small>
-            <p class="reason">{{ destination.reason }}</p>
-            <footer><span>适合 {{ destination.bestSeason }}</span><button @click="openCreate('TRIP')">加入期待清单 ＋</button></footer>
-          </article>
-        </div>
-        <div class="recommendation-note">
-          <span>✦</span>
-          <p><strong>推荐会越来越懂你们</strong>记录更多去过的城市和喜欢的体验，下一站建议也会跟着变化。</p>
-        </div>
-      </section>
-    </main>
-
-    <footer class="page-footer">
-      <span>∴</span>
-      <p>愿以后翻开这里，每一页都有当时的风。</p>
-      <small>Made for two · {{ new Date().getFullYear() }}</small>
-    </footer>
-
-    <div v-if="modalOpen" class="modal-backdrop" @click.self="modalOpen = false">
-      <form class="modal" @submit.prevent="saveMemory">
-        <button type="button" class="modal-close" aria-label="关闭" @click="modalOpen = false">×</button>
-        <p class="eyebrow">{{ editingId ? 'EDIT A MEMORY' : 'A NEW MEMORY' }}</p>
-        <h2>{{ editingId ? '重新写好这段故事' : '今天，发生了什么好事？' }}</h2>
-        <div class="type-switch">
-          <button type="button" :class="{ active: form.type === 'RESTAURANT' }" @click="setType('RESTAURANT')">🍜 吃喝记录</button>
-          <button type="button" :class="{ active: form.type === 'TRIP' }" @click="setType('TRIP')">🧳 旅行足迹</button>
-        </div>
-        <div class="category-switch" v-if="form.type === 'RESTAURANT'">
-          <button
-            v-for="category in categoryOptions.filter(item => item.value !== 'TRIP')"
-            :key="category.value"
-            type="button"
-            :class="{ active: form.category === category.value }"
-            @click="setCategory(category.value)"
-          >
-            <span>{{ category.emoji }}</span>{{ category.label }}
-          </button>
-        </div>
-        <label>这段回忆的名字<input v-model.trim="form.title" required maxlength="100" placeholder="例如：海边看过的那场日落"></label>
-        <div class="place-search">
-          <div class="place-search-row">
-            <label>搜索店铺 / 地址<input v-model.trim="placeKeyword" placeholder="例如：茶颜悦色 五一广场"></label>
-            <button type="button" class="secondary" :disabled="placeSearching" @click="searchPlaces">{{ placeSearching ? '搜索中' : '搜索' }}</button>
-          </div>
-          <div v-if="placeMessage" class="place-message">{{ placeMessage }}</div>
-          <div v-if="placeResults.length" class="place-results">
-            <button v-for="place in placeResults" :key="place.id" type="button" @click="selectPlace(place)">
-              <strong>{{ place.name }}</strong>
-              <small>{{ place.city }} {{ place.district }} {{ place.address }}</small>
-            </button>
-          </div>
-        </div>
-        <div class="form-row">
-          <label>城市<input v-model.trim="form.city" required placeholder="厦门"></label>
-          <label>地点<input v-model.trim="form.address" placeholder="鼓浪屿"></label>
-        </div>
-        <div class="form-row">
-          <label>省份<input v-model.trim="form.province" placeholder="福建"></label>
-          <label>区县<input v-model.trim="form.district" placeholder="思明区"></label>
-        </div>
-        <div class="form-row">
-          <label>纬度<input v-model.number="form.latitude" type="number" step="0.000001" placeholder="24.448"></label>
-          <label>经度<input v-model.number="form.longitude" type="number" step="0.000001" placeholder="118.063"></label>
-        </div>
-        <div class="form-row">
-          <label>日期<input v-model="form.visitedAt" type="date" required></label>
-          <label>心动指数
-            <select v-model="form.rating">
-              <option :value="5">★★★★★ 一定再去</option>
-              <option :value="4">★★★★☆ 很喜欢</option>
-              <option :value="3">★★★☆☆ 还不错</option>
-              <option :value="2">★★☆☆☆ 一般般</option>
-              <option :value="1">★☆☆☆☆ 特别体验</option>
-            </select>
-          </label>
-        </div>
-        <label v-if="form.category === 'MILK_TEA'">这座城市的特色奶茶<input v-model.trim="form.specialty" placeholder="例如：幽兰拿铁、桂花乌龙奶茶"></label>
-        <label>想留下的话<textarea v-model.trim="form.note" maxlength="1000" rows="4" placeholder="写下味道、天气、说过的话，或一个只有你们懂的细节"></textarea></label>
-        <label>标签<input v-model.trim="form.tags" placeholder="海边, 日落, 周末（用逗号分隔）"></label>
-        <button class="primary submit-button" :disabled="saving">{{ saving ? '正在收藏...' : '收进漫游簿' }}</button>
+    <section v-else-if="!me" class="auth-layout">
+      <div class="brand-intro"><span class="brand-orbit">⌁</span><p class="eyebrow">TOGETHER, IN MOTION</p><h1>把“去哪”<br>变成共同期待。</h1><p>不必先收藏，也能为你们推荐此刻和下一个周末最值得出发的地方。</p><div class="feature-row"><span>☔ 看天气</span><span>♡ 懂偏好</span><span>✦ 一起决定</span></div></div>
+      <form class="auth-card" @submit.prevent="submitAuth">
+        <p class="eyebrow">PRIVATE SPACE</p><h2>{{ authMode === 'login' ? '欢迎回来' : '建立你的账户' }}</h2><p class="muted">{{ authMode === 'login' ? '登录后继续你们的下一次出发。' : '使用邮箱创建私密的双人决策空间。' }}</p>
+        <label v-if="authMode === 'register'">怎么称呼你<input v-model.trim="authForm.displayName" maxlength="80" required placeholder="例如：小明"></label>
+        <label>邮箱<input v-model.trim="authForm.email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+        <label>密码<input v-model="authForm.password" type="password" minlength="8" required autocomplete="current-password" placeholder="至少 8 位"></label>
+        <p v-if="error" class="error">{{ error }}</p>
+        <button class="primary wide" :disabled="submitting">{{ submitting ? '处理中…' : authMode === 'login' ? '进入双人空间' : '创建账户' }}</button>
+        <button type="button" class="text-button" @click="authMode = authMode === 'login' ? 'register' : 'login'; error = ''">{{ authMode === 'login' ? '还没有账户？创建一个' : '已有账户？直接登录' }}</button>
       </form>
-    </div>
+    </section>
 
+    <section v-else-if="isSetup" class="setup-card">
+      <span class="brand-orbit">⌁</span><p class="eyebrow">FIRST STEP</p><h1>先建立你们的私密空间</h1><p class="muted">每位成员各自有账户，在同一个空间中保留偏好、投票和计划。</p>
+      <div class="segmented"><button :class="{ active: setupMode === 'create' }" @click="setupMode = 'create'">我来创建</button><button :class="{ active: setupMode === 'join' }" @click="setupMode = 'join'">加入对方</button></div>
+      <form @submit.prevent="createOrJoinSpace">
+        <template v-if="setupMode === 'create'"><label>空间名字<input v-model.trim="spaceForm.name" required maxlength="100"></label><label>常驻城市<input v-model.trim="spaceForm.city" required maxlength="80" placeholder="杭州"></label></template>
+        <label v-else>邀请口令<input v-model.trim="spaceForm.token" required placeholder="粘贴对方发来的口令"></label>
+        <p v-if="error" class="error">{{ error }}</p><button class="primary wide" :disabled="submitting">{{ setupMode === 'create' ? '建立并继续' : '加入空间' }}</button>
+      </form>
+    </section>
+
+    <section v-else-if="needsPreferences" class="setup-card preference-setup">
+      <p class="eyebrow">MAKE IT YOURS</p><h1>先认识一下你</h1><p class="muted">这些偏好只服务于你们的空间，并可随时调整。</p>
+      <form @submit.prevent="savePreferences"><div class="two-columns"><label>常驻城市<input v-model.trim="preferenceForm.city" required></label><label>单次预算（元）<input v-model.number="preferenceForm.budget" type="number" min="0" max="10000" required></label></div><label>喜欢吃什么？<input v-model="preferenceForm.foodTags" placeholder="例如：川菜, 咖啡, 面馆"></label><label>喜欢做什么？<input v-model="preferenceForm.activityTags" placeholder="例如：展览, 散步, 看电影"></label><label>旅行偏好<input v-model="preferenceForm.travelTags" placeholder="例如：海边, 慢旅行, 古城"></label><label>可接受的本地出行半径（km）<input v-model.number="preferenceForm.travelRadiusKm" type="number" min="1" max="200" required></label><p v-if="error" class="error">{{ error }}</p><button class="primary wide" :disabled="submitting">生成第一批推荐</button></form>
+    </section>
+
+    <template v-else>
+      <header class="app-header"><button class="wordmark" @click="activeTab = 'discover'"><span>⌁</span><b>{{ space?.name }}</b></button><button class="avatar" @click="activeTab = 'settings'">{{ me.displayName.slice(0, 1) }}</button></header>
+      <section v-if="error" class="banner error">{{ error }} <button @click="error = ''">×</button></section>
+      <section v-if="activeTab === 'discover'" class="content"><div class="greeting"><p class="eyebrow">{{ city }} · 为两个人准备</p><h1>今天，想一起<br><em>去哪里？</em></h1><button class="refresh" @click="refreshRecommendations">↻ 更新建议</button></div>
+        <section class="recommendation-section"><div class="section-heading"><div><p>此刻可去</p><h2>今晚，去哪里？</h2></div><span class="weather">{{ today?.weather || '正在读取天气' }}</span></div><p v-if="today" class="source-status">{{ today.sourceStatus }}</p><div class="recommendation-stack"><article v-for="card in today?.candidates || []" :key="card.id" class="recommendation-card today-card"><div class="card-score">{{ card.score }}<small>匹配</small></div><div class="card-content"><p class="category">{{ card.category }}</p><h3>{{ card.title }}</h3><p>{{ card.reason }}</p><small>依据：{{ card.scoreBreakdown }}</small><div class="card-actions"><button @click="feedback(card, 'WANT')">♡ 想去</button><button @click="feedback(card, 'SKIP')">不太想去</button><button class="solid-action" @click="addPlan(card)">加入计划 →</button></div></div></article></div></section>
+        <section class="recommendation-section weekend-section"><div class="section-heading"><div><p>提前期待</p><h2>下个周末，去哪？</h2></div><span class="spark">✦</span></div><div class="recommendation-stack"><article v-for="card in weekend?.candidates || []" :key="card.id" class="recommendation-card weekend-card"><div class="card-score">{{ card.score }}<small>匹配</small></div><div class="card-content"><p class="category">{{ card.bestSeason }}</p><h3>{{ card.title }}</h3><p>{{ card.reason }}</p><small>{{ card.estimate }} · {{ card.sourceLabel }}</small><div class="card-actions"><button @click="feedback(card, 'VOTE')">✦ 投给它</button><button class="solid-action" @click="addPlan(card)">加入候选 →</button></div></div></article></div></section>
+      </section>
+      <section v-else-if="activeTab === 'plans'" class="content"><div class="greeting"><p class="eyebrow">OUR NEXT STORIES</p><h1>共同计划</h1><p class="muted">把一个候选放进计划，再把完成的行程沉淀成回忆。</p></div><div v-if="plans.length" class="plan-list"><article v-for="plan in plans" :key="plan.id" class="plan-card"><span class="plan-status" :class="plan.status.toLowerCase()">{{ plan.status === 'COMPLETED' ? '已完成' : '进行中' }}</span><h3>{{ plan.title }}</h3><p>{{ plan.city }} · {{ plan.budget ? `预算 ¥${plan.budget}` : '预算待定' }}</p><p v-if="plan.note" class="muted">{{ plan.note }}</p><button v-if="plan.status !== 'COMPLETED'" class="primary small" @click="completePlan(plan)">完成并写入回忆</button></article></div><div v-else class="empty-state"><span>⌁</span><h2>还没有计划</h2><p>从“发现”页把一个喜欢的建议加入这里。</p><button class="primary" @click="activeTab = 'discover'">去看推荐</button></div></section>
+      <section v-else class="content settings"><div class="greeting"><p class="eyebrow">YOUR SIGNALS</p><h1>偏好与空间</h1></div><form class="settings-form" @submit.prevent="savePreferences"><div class="two-columns"><label>常驻城市<input v-model.trim="preferenceForm.city" required></label><label>单次预算<input v-model.number="preferenceForm.budget" type="number" min="0" max="10000" required></label></div><label>喜欢吃什么？<input v-model="preferenceForm.foodTags"></label><label>喜欢做什么？<input v-model="preferenceForm.activityTags"></label><label>旅行偏好<input v-model="preferenceForm.travelTags"></label><label>出行半径（km）<input v-model.number="preferenceForm.travelRadiusKm" type="number" min="1" max="200" required></label><button class="primary wide" :disabled="submitting">保存并更新推荐</button></form><section class="invite-box"><p class="eyebrow">INVITE PARTNER</p><h2>邀请另一位成员</h2><p class="muted">邀请码 72 小时有效，仅能使用一次。</p><button class="secondary wide" @click="createInvite">生成邀请口令</button><code v-if="inviteToken">{{ inviteToken }}</code></section><button class="logout" @click="logout">退出登录</button></section>
+      <nav class="bottom-nav"><button :class="{ active: activeTab === 'discover' }" @click="activeTab = 'discover'"><span>⌁</span>发现</button><button :class="{ active: activeTab === 'plans' }" @click="activeTab = 'plans'"><span>□</span>计划</button><button :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'"><span>◌</span>我的</button></nav>
+    </template>
     <div v-if="toast" class="toast">{{ toast }}</div>
-  </div>
+  </main>
 </template>

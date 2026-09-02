@@ -18,21 +18,23 @@ public class MemoryService {
         this.repository = repository;
     }
 
-    public List<Memory> findAll() {
-        return repository.findAllByOrderByVisitedAtDesc();
+    public List<Memory> findAll(Long spaceId) {
+        return repository.findAllBySpaceIdOrderByVisitedAtDesc(spaceId);
     }
 
-    public Memory create(Memory memory) {
+    public Memory create(Long spaceId, Memory memory) {
         memory.setId(null);
+        memory.setSpaceId(spaceId);
         if (memory.getEmoji() == null || memory.getEmoji().trim().isEmpty()) {
             memory.setEmoji(memory.getType() == MemoryType.RESTAURANT ? "🍜" : "🧳");
         }
         return repository.save(memory);
     }
 
-    public Memory update(Long id, Memory incoming) {
+    public Memory update(Long spaceId, Long id, Memory incoming) {
         Memory memory = repository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("没有找到这条回忆"));
+        if (!spaceId.equals(memory.getSpaceId())) throw new SecurityException("无权修改这条回忆");
         memory.setTitle(incoming.getTitle());
         memory.setType(incoming.getType());
         memory.setCity(incoming.getCity());
@@ -52,26 +54,25 @@ public class MemoryService {
         return repository.save(memory);
     }
 
-    public void delete(Long id) {
-        if (!repository.existsById(id)) {
-            throw new NoSuchElementException("没有找到这条回忆");
-        }
-        repository.deleteById(id);
+    public void delete(Long spaceId, Long id) {
+        Memory memory = repository.findById(id).orElseThrow(() -> new NoSuchElementException("没有找到这条回忆"));
+        if (!spaceId.equals(memory.getSpaceId())) throw new SecurityException("无权删除这条回忆");
+        repository.delete(memory);
     }
 
-    public DashboardSummary getSummary() {
-        List<Memory> all = repository.findAll();
+    public DashboardSummary getSummary(Long spaceId) {
+        List<Memory> all = repository.findAllBySpaceIdOrderByVisitedAtDesc(spaceId);
         long cities = all.stream().map(Memory::getCity).filter(Objects::nonNull).distinct().count();
         return new DashboardSummary(
                 all.size(),
-                repository.countByType(MemoryType.RESTAURANT),
-                repository.countByType(MemoryType.TRIP),
+                repository.countBySpaceIdAndType(spaceId, MemoryType.RESTAURANT),
+                repository.countBySpaceIdAndType(spaceId, MemoryType.TRIP),
                 cities
         );
     }
 
-    public List<DestinationRecommendation> recommend() {
-        Set<String> visited = repository.findAll().stream()
+    public List<DestinationRecommendation> recommend(Long spaceId) {
+        Set<String> visited = repository.findAllBySpaceIdOrderByVisitedAtDesc(spaceId).stream()
                 .map(Memory::getCity)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -95,7 +96,7 @@ public class MemoryService {
                 .collect(Collectors.toList());
     }
 
-    public List<Memory> findMilkTea() {
-        return repository.findByCategoryIgnoreCaseOrderByVisitedAtDesc("MILK_TEA");
+    public List<Memory> findMilkTea(Long spaceId) {
+        return repository.findBySpaceIdAndCategoryIgnoreCaseOrderByVisitedAtDesc(spaceId, "MILK_TEA");
     }
 }

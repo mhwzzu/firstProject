@@ -1,0 +1,4 @@
+package com.mhw.journey.dto;
+import javax.validation.constraints.NotNull;
+import java.time.LocalDate;
+public class CreatePlanRequest { @NotNull private Long candidateId; private LocalDate startDate; private LocalDate endDate; private Integer budget; private String note=""; public Long getCandidateId(){return candidateId;} public void setCandidateId(Long candidateId){this.candidateId=candidateId;} public LocalDate getStartDate(){return startDate;} public void setStartDate(LocalDate startDate){this.startDate=startDate;} public LocalDate getEndDate(){return endDate;} public void setEndDate(LocalDate endDate){this.endDate=endDate;} public Integer getBudget(){return budget;} public void setBudget(Integer budget){this.budget=budget;} public String getNote(){return note;} public void setNote(String note){this.note=note;} }

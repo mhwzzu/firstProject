@@ -20,6 +20,12 @@ public class ApiExceptionHandler {
         return Collections.singletonMap("message", exception.getMessage());
     }
 
+    @ExceptionHandler(SecurityException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Map<String, String> handleForbidden(SecurityException exception) {
+        return Collections.singletonMap("message", exception.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Map<String, String> handleValidation(MethodArgumentNotValidException exception) {

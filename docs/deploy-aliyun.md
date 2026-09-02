@@ -26,11 +26,12 @@ cp .env.example .env
 
 ```env
 POSTGRES_PASSWORD=你的数据库强密码
-APP_USERNAME=mhwzzu
-APP_PASSWORD=你的登录密码
 AMAP_KEY=你的高德Web服务Key
+APP_SECURE_COOKIE=false
 WEB_PORT=80
 ```
+
+`APP_SECURE_COOKIE` 仅在域名和 HTTPS 已配置完成后设为 `true`；纯 HTTP 的测试环境保持 `false`，否则浏览器不会发送会话 Cookie。
 
 启动：
 

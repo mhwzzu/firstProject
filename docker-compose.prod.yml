@@ -22,9 +22,8 @@ services:
       DB_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-together_journey}
       DB_USERNAME: ${POSTGRES_USER:-journey}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in .env}
-      APP_USERNAME: ${APP_USERNAME:-mhwzzu}
-      APP_PASSWORD: ${APP_PASSWORD:?Please set APP_PASSWORD in .env}
       AMAP_KEY: ${AMAP_KEY:-}
+      APP_SECURE_COOKIE: ${APP_SECURE_COOKIE:-false}
     networks:
       - journey-net
 

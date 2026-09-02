@@ -1,0 +1,10 @@
+{
+  "name": "两个人的漫游簿",
+  "short_name": "漫游簿",
+  "description": "为两个人主动推荐此刻和下一个周末值得出发的地方。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5ef",
+  "theme_color": "#244d3c",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
