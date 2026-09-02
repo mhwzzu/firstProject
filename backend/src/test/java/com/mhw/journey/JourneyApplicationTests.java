@@ -31,8 +31,9 @@ class JourneyApplicationTests {
         HttpHeaders partner = register("partner@example.com", "小雨");
         String joined = exchange("/api/v1/spaces/join", HttpMethod.POST, partner, map("token", textField(invite, "token")));
         assertThat(joined).contains("小明").contains("小雨");
-        String today = exchange("/api/v1/recommendations/today", HttpMethod.GET, owner, null);
-        assertThat(today).contains("\"type\":\"TODAY\"").contains("sourceStatus").contains("scoreBreakdown");
+        String today = exchange("/api/v1/recommendations/today?city=%E6%9D%AD%E5%B7%9E&prompt=%E5%91%A8%E6%9C%AB%E6%83%B3%E5%92%96%E5%95%A1&tags=%E5%92%96%E5%95%A1&budget=120&travelMinutes=30&latitude=30.2741&longitude=120.1551", HttpMethod.GET, owner, null);
+        assertThat(today).contains("\"type\":\"TODAY\"").contains("sourceStatus").contains("scoreBreakdown")
+                .contains("querySummary").contains("locationStatus").contains("distanceKm").contains("travelDataStatus").contains("navigationUrl");
         long candidateId = firstId(today);
         String feedback = exchange("/api/v1/candidates/" + candidateId + "/feedback", HttpMethod.POST, partner, map("action", "WANT"));
         assertThat(feedback).contains("\"action\":\"WANT\"");
