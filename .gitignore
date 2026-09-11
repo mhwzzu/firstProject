@@ -17,4 +17,5 @@ backend/target/
 .env.*
 !.env.example
 data/
+.superpowers/
 
