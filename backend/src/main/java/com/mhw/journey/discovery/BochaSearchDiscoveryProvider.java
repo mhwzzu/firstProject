@@ -82,6 +82,8 @@ public class BochaSearchDiscoveryProvider implements ContentDiscoveryProvider {
             if (!useful(url, title, platform)) continue;
             String summary = text(item, "summary");
             if (summary.isEmpty()) summary = text(item, "snippet");
+            String city = query == null ? "" : query.trim().split("\\s+")[0];
+            if (!city.isEmpty() && !(title + " " + summary).contains(city)) continue;
             output.add(new DiscoveredContent(platform, title, clean(summary, 1000), url, parseDate(text(item, "datePublished"))));
         }
         return output;
@@ -98,8 +100,9 @@ public class BochaSearchDiscoveryProvider implements ContentDiscoveryProvider {
 
     private boolean useful(String url, String title, DiscoveryPlatform platform) {
         try {
-            String path = URI.create(url).getPath();
+            URI parsed = URI.create(url); String path = parsed.getPath(); String host = parsed.getHost();
             if (path == null || path.isEmpty() || "/".equals(path) || "/explore".equals(path)) return false;
+            if (host != null && (host.startsWith("vdisk.") || host.startsWith("open.") || host.startsWith("help."))) return false;
         } catch (Exception ignored) { return false; }
         String compact = title.replaceAll("\\s+", "");
         return !compact.equals(platform.getLabel()) && !compact.startsWith(platform.getLabel() + "-");

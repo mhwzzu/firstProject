@@ -211,7 +211,7 @@ public class RecommendationService {
     private String reason(List<PreferenceProfile> people,DecisionQuery query,String weather,String tail,List<DiscoveryRecord> related,int learning){
         String preferences=combined(people,"food"); if(preferences.trim().isEmpty())preferences="你们设置的探索偏好";
         String prompt=query.getPrompt()==null||query.getPrompt().trim().isEmpty()?"":("；已纳入“"+truncate(query.getPrompt(),40)+"”");
-        String sources=related.isEmpty()?"":"；参考了 "+platforms(related)+" 的近期公开内容";
+        String sources=related.isEmpty()?"":"；参考了 "+platforms(related)+" 的公开索引内容";
         String learned=learning>0?"；你们过去对相似地点有过心动记录":learning<0?"；已降低曾跳过的相似地点权重":"";
         return "结合双方偏好（"+preferences+"）、"+weather+"和"+tail+prompt+sources+learned+"。";
     }
