@@ -36,7 +36,7 @@ class ContentDiscoveryServiceTests {
         assertThat(batch.getRecords()).hasSize(4);
         assertThat(batch.getRecords()).allSatisfy(record -> {
             assertThat(record.getSpaceId()).isEqualTo(1L);
-            assertThat(record.getQueryText()).contains("杭州").contains("周末").contains("想安静散步");
+            assertThat(record.getQueryText()).contains("杭州").contains("周末").contains("旅游").contains("攻略");
             assertThat(record.getFingerprint()).hasSize(64);
         });
         verify(provider, times(4)).search(any(DiscoveryPlatform.class), anyString(), eq(3));

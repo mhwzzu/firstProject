@@ -2,7 +2,7 @@
 
 一个面向两人的私密出行决策与共同回忆应用。它会结合双方偏好、城市、天气、时间与季节，主动推荐“今晚去哪里”和“下个周末去哪”，并将心动、略过、计划和已完成行程沉淀为后续推荐信号。
 
-当前版本包含独立账户、双人空间邀请码、偏好引导、可解释的自动推荐、共同计划，以及一个可手动控制的共同决策地图：输入自然语言、城市、预算、车程和关键词，允许浏览器定位后查看候选地点、距离、车程估算和高德路线。
+当前版本采用 Atlas Noir「夜幕地图」产品界面，包含独立账户、双人空间、自然语言决策、实时内容证据、高德地点/路线、可展开天气卡、心愿、共同计划、足迹地图、回忆时间线和双方偏好设置。
 
 推荐页支持“换一批”和“更新近期攻略”。配置内容发现服务后，系统会自动搜索小红书、抖音、微博和知乎近期公开索引内容，将标题、短摘要和原文链接作为推荐证据；不需要用户手工收藏链接。
 
@@ -13,7 +13,29 @@
 - PostgreSQL 16（Docker）
 - H2（无需 Docker 的本地快速体验）
 
-## 本地启动
+## 本地启动（推荐）
+
+复制 `.env.example` 为 `.env.local`，填写高德 Web 服务 Key 和博查 Web Search API Key：
+
+```properties
+AMAP_KEY=你的高德Web服务Key
+BOCHA_API_KEY=你的博查APIKey
+DISCOVERY_ENABLED=true
+```
+
+`.env.local` 已被 Git 忽略，后端会自动读取，不需要每次设置 PowerShell 环境变量。然后在仓库根目录运行：
+
+```powershell
+.\start-local.ps1
+```
+
+脚本会在后台启动前后端并打开 `http://localhost:5173`。停止服务：
+
+```powershell
+.\stop-local.ps1
+```
+
+## 分别启动
 
 ### 1. 启动后端
 
@@ -59,17 +81,16 @@ mvn spring-boot:run
 
 ## 自动发现近期攻略
 
-首个内容发现适配器使用 Brave Search API 查询四个平台已经公开索引的页面。申请 API Key 后，在启动后端的同一个 PowerShell 窗口中设置：
+默认内容发现适配器使用博查 Web Search API 查询四个平台已经公开索引的页面。配置写入根目录 `.env.local`：
 
 ```powershell
-$env:DISCOVERY_ENABLED="true"
-$env:BRAVE_SEARCH_API_KEY="你的 Brave Search API Key"
-$env:DISCOVERY_CACHE_MINUTES="60"
-$env:DISCOVERY_RESULT_LIMIT="3"
-mvn spring-boot:run
+DISCOVERY_ENABLED=true
+BOCHA_API_KEY=你的博查APIKey
+DISCOVERY_CACHE_MINUTES=60
+DISCOVERY_RESULT_LIMIT=3
 ```
 
-然后在推荐页点击“更新近期攻略”。页面会展示当前已连接来源、更新时间和可跳转的原文证据。没有配置 Key 或某个平台临时失败时，推荐、地图和路线仍可使用，并明确显示降级状态。
+然后在“下一次”点击“更新近期灵感”。页面会展示当前已连接来源、更新时间和可跳转的原文证据。没有配置 Key 或某个平台临时失败时，推荐、地图和路线仍可使用，并明确显示降级状态。
 
 发现服务遵循以下边界：不绕过登录、验证码和平台访问控制；不使用个人 Cookie；不复制整篇正文、视频或图片。后续可以在统一的 `ContentDiscoveryProvider` 接口下增加知乎、微博和抖音官方适配器，不影响现有推荐流程。
 

@@ -12,13 +12,17 @@ amap:
 
 discovery:
   enabled: ${DISCOVERY_ENABLED:false}
+  bocha-api-key: ${BOCHA_API_KEY:}
+  bocha-api-base-url: ${BOCHA_API_BASE_URL:https://api.bochaai.com/v1}
   brave-api-key: ${BRAVE_SEARCH_API_KEY:}
   cache-minutes: ${DISCOVERY_CACHE_MINUTES:60}
   result-limit: ${DISCOVERY_RESULT_LIMIT:3}
 
 spring:
+  config:
+    import: optional:file:../.env.local[.properties],optional:file:.env.local[.properties]
   datasource:
-    url: jdbc:h2:mem:journey;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;DATABASE_TO_LOWER=TRUE
+    url: ${DB_URL:jdbc:h2:file:../data/journey;MODE=PostgreSQL;AUTO_SERVER=TRUE;DATABASE_TO_LOWER=TRUE}
     username: sa
     password:
     driver-class-name: org.h2.Driver

@@ -6,4 +6,5 @@ import java.util.Optional;
 public interface CandidateFeedbackRepository extends JpaRepository<CandidateFeedback, Long> {
     Optional<CandidateFeedback> findByCandidateIdAndUserId(Long candidateId, Long userId);
     List<CandidateFeedback> findByUserId(Long userId);
+    List<CandidateFeedback> findByUserIdInAndActionOrderByCreatedAtDesc(List<Long> userIds, String action);
 }

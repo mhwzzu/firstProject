@@ -38,10 +38,14 @@ class JourneyApplicationTests {
         long candidateId = firstId(today);
         String feedback = exchange("/api/v1/candidates/" + candidateId + "/feedback", HttpMethod.POST, partner, map("action", "WANT"));
         assertThat(feedback).contains("\"action\":\"WANT\"");
+        assertThat(exchange("/api/v1/wishes", HttpMethod.GET, partner, null)).contains("\"mine\":true").contains("\"title\"");
+        assertThat(exchange("/api/v1/weather?city=%E6%9D%AD%E5%B7%9E", HttpMethod.GET, owner, null)).contains("\"available\":false").contains("days");
+        assertThat(exchange("/api/v1/integrations/status", HttpMethod.GET, owner, null)).contains("discovery").contains("amap");
         String plan = exchange("/api/v1/plans", HttpMethod.POST, owner, map("candidateId", candidateId, "budget", 180, "note", "一起去看看"));
         long planId = firstId(plan);
         assertThat(exchange("/api/v1/plans/" + planId + "/complete", HttpMethod.POST, owner, null)).contains("\"status\":\"COMPLETED\"");
         assertThat(exchange("/api/v1/plans", HttpMethod.GET, partner, null)).contains("\"title\"");
+        assertThat(exchange("/api/memories", HttpMethod.GET, partner, null)).contains("\"planId\":" + planId).contains("共同计划");
     }
 
     private HttpHeaders register(String email, String name) {

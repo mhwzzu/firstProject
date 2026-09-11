@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class ContentDiscoveryService {
@@ -38,19 +39,25 @@ public class ContentDiscoveryService {
         List<DiscoveryRecord> discovered = new ArrayList<>();
         if (!provider.isConfigured()) {
             for (DiscoveryPlatform platform : DiscoveryPlatform.values()) unavailable.add(platform.getLabel());
-            return new DiscoveryBatch("DEGRADED", "近期攻略源尚未连接；配置 BRAVE_SEARCH_API_KEY 后即可自动发现四个平台公开内容",
+            return new DiscoveryBatch("DEGRADED", "近期攻略源尚未连接；配置 BOCHA_API_KEY 后即可自动发现四个平台公开内容",
                     connected, unavailable, LocalDateTime.now(), discovered);
         }
+        List<CompletableFuture<PlatformResult>> searches = new ArrayList<>();
         for (DiscoveryPlatform platform : DiscoveryPlatform.values()) {
-            try {
-                List<DiscoveredContent> items = provider.search(platform, topic, resultLimit);
-                connected.add(platform.getLabel());
-                for (DiscoveredContent item : items) discovered.add(records.save(record(spaceId, queryKey, topic, item)));
-            } catch (Exception ignored) { unavailable.add(platform.getLabel()); }
+            searches.add(CompletableFuture.supplyAsync(() -> {
+                try { return new PlatformResult(platform, provider.search(platform, topic, resultLimit), null); }
+                catch (Exception exception) { return new PlatformResult(platform, Collections.<DiscoveredContent>emptyList(), exception); }
+            }));
+        }
+        for (CompletableFuture<PlatformResult> search : searches) {
+            PlatformResult result = search.join();
+            if (result.error != null) { unavailable.add(result.platform.getLabel()); continue; }
+            connected.add(result.platform.getLabel());
+            for (DiscoveredContent item : result.items) discovered.add(records.save(record(spaceId, queryKey, topic, item)));
         }
         String status = discovered.isEmpty() ? "DEGRADED" : unavailable.isEmpty() ? "LIVE" : "PARTIAL";
-        String message = "LIVE".equals(status) ? "四个平台近期公开内容已更新" :
-                "PARTIAL".equals(status) ? "近期攻略已更新，部分来源暂时不可用" : "本次没有获取到近期公开内容，已使用地图与偏好结果";
+        String message = "LIVE".equals(status) ? "四个平台公开索引已更新" :
+                "PARTIAL".equals(status) ? "公开内容已更新，部分来源暂时不可用" : "本次没有获取到公开内容，已使用地图与偏好结果";
         return new DiscoveryBatch(status, message, connected, unavailable, LocalDateTime.now(), deduplicate(discovered));
     }
 
@@ -78,9 +85,8 @@ public class ContentDiscoveryService {
         return new ArrayList<>(unique.values());
     }
     private String query(String type, String city, String prompt, String tags) {
-        String season = season(); String intent = clean(prompt).isEmpty() ? clean(tags) : clean(prompt);
-        if (intent.isEmpty()) intent = "情侣 约会 美食 旅行";
-        return city + " " + season + " " + ("WEEKEND".equals(type) ? "周末 攻略" : "近期 去哪玩 吃什么") + " " + intent;
+        String season = season();
+        return city + " " + season + " " + ("WEEKEND".equals(type) ? "周末 旅游 攻略" : "美食 约会 攻略");
     }
     private String season() { int month=LocalDate.now().getMonthValue(); return month<=2||month==12?"冬季":month<=5?"春季":month<=8?"夏季":"秋季"; }
     private String placeKeyword(String title) {
@@ -91,5 +97,10 @@ public class ContentDiscoveryService {
     private String hash(String input) {
         try { byte[] bytes=MessageDigest.getInstance("SHA-256").digest(input.getBytes(StandardCharsets.UTF_8)); StringBuilder out=new StringBuilder(); for(byte b:bytes) out.append(String.format("%02x",b & 0xff)); return out.toString(); }
         catch (Exception exception) { return Integer.toHexString(input.hashCode()); }
+    }
+
+    private static class PlatformResult {
+        private final DiscoveryPlatform platform; private final List<DiscoveredContent> items; private final Exception error;
+        private PlatformResult(DiscoveryPlatform platform,List<DiscoveredContent> items,Exception error){this.platform=platform;this.items=items;this.error=error;}
     }
 }

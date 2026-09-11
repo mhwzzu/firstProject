@@ -109,7 +109,8 @@ public class RecommendationService {
         if (!direct.isEmpty()) return direct;
         if (records.isEmpty()) return direct;
         int start = Math.floorMod(position - 1, records.size());
-        for (int i=0; i<Math.min(2, records.size()); i++) direct.add(records.get((start+i)%records.size()));
+        Set<String> usedPlatforms=new HashSet<>();
+        for (int i=0; i<records.size() && direct.size()<3; i++) {DiscoveryRecord candidate=records.get((start+i)%records.size());if(usedPlatforms.add(candidate.getPlatform()))direct.add(candidate);}
         return direct;
     }
 
@@ -120,7 +121,7 @@ public class RecommendationService {
             boolean direct = normalize(record.getTitle() + " " + nullToEmpty(record.getSnippet())).contains(needle);
             RecommendationEvidence item = new RecommendationEvidence(); item.setCandidateId(candidateId);
             item.setPlatform(record.getPlatform()); item.setTitle(record.getTitle()); item.setSummary(record.getSnippet());
-            item.setSourceUrl(record.getSourceUrl()); item.setRelationLabel(direct ? "提及此地点" : "同主题近期灵感");
+            item.setSourceUrl(record.getSourceUrl()); item.setRelationLabel(direct ? "提及此地点" : "同主题公开灵感");
             item.setPublishedAt(record.getPublishedAt()); item.setDiscoveredAt(record.getDiscoveredAt()); evidence.save(item);
             views.add(new RecommendationResponse.Evidence(item.getPlatform(), item.getTitle(), item.getSummary(), item.getSourceUrl(),
                     item.getRelationLabel(), item.getPublishedAt(), item.getDiscoveredAt()));
@@ -191,15 +192,16 @@ public class RecommendationService {
     private List<PlaceSearchResult> fallbackPlaces(String city,String keyword){
         double[] c=cityCenter(city); List<PlaceSearchResult> list=new ArrayList<>();
         for(int i=1;i<=6;i++){double offset=(i-3)*.012; list.add(new PlaceSearchResult("fallback-"+city+"-"+keyword+"-"+i,
-                city+" · "+keyword+"推荐 "+i,"",city,"","未配置地图服务，地点为示例位置",c[0]+offset,c[1]-offset));}
+                city+" · "+keyword+"灵感 "+i,"",city,"","地图实时检索暂不可用，当前为可替换的示意位置",c[0]+offset,c[1]-offset));}
         return list;
     }
     private String keyword(List<PreferenceProfile> people,DecisionQuery query,String fallback){
-        String explicit=firstTag(query.getTags(),""); if(!explicit.isEmpty())return explicit;
-        String prompt=firstTag(query.getPrompt(),""); if(!prompt.isEmpty()&&!looksLikeSentence(prompt))return prompt;
+        String explicit=firstTag(query.getTags(),""); if(!explicit.isEmpty())return mapKeyword(explicit);
+        String prompt=firstTag(query.getPrompt(),""); if(!prompt.isEmpty()&&!looksLikeSentence(prompt))return mapKeyword(prompt);
         String preferences=combined(people,"food"); if (preferences.trim().isEmpty()) preferences=combined(people,"activity");
-        return firstTag(preferences,fallback);
+        return mapKeyword(firstTag(preferences,fallback));
     }
+    private String mapKeyword(String input){String value=input==null?"":input.trim();if(value.matches(".*(秋景|赏花|自然|风景|户外|爬山).*"))return "景点";if(value.matches(".*(散步|公园|绿道).*"))return "公园";if(value.matches(".*(展览|博物|艺术).*"))return "博物馆";if(value.matches(".*(暖食|吃|美食|晚餐|餐厅).*"))return "餐厅";return value;}
     private boolean looksLikeSentence(String value){return value.length()>12||value.contains("想")||value.contains("去")||value.contains("周末");}
     private String combined(List<PreferenceProfile> people,String field){
         StringBuilder b=new StringBuilder(); for(PreferenceProfile p:people){String v="food".equals(field)?p.getFoodTags():p.getActivityTags();
