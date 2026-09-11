@@ -10,6 +10,12 @@ server:
 amap:
   key: ${AMAP_KEY:}
 
+discovery:
+  enabled: ${DISCOVERY_ENABLED:false}
+  brave-api-key: ${BRAVE_SEARCH_API_KEY:}
+  cache-minutes: ${DISCOVERY_CACHE_MINUTES:60}
+  result-limit: ${DISCOVERY_RESULT_LIMIT:3}
+
 spring:
   datasource:
     url: jdbc:h2:mem:journey;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;DATABASE_TO_LOWER=TRUE

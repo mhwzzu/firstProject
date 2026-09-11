@@ -13,9 +13,10 @@ public class DecisionQuery {
     private final Double longitude;
     private final Integer budget;
     private final Integer travelMinutes;
+    private final Integer variation;
 
     public DecisionQuery(String city, String prompt, String tags, Double latitude, Double longitude,
-                         Integer budget, Integer travelMinutes) {
+                         Integer budget, Integer travelMinutes, Integer variation) {
         this.city = city;
         this.prompt = prompt;
         this.tags = tags;
@@ -23,6 +24,7 @@ public class DecisionQuery {
         this.longitude = longitude;
         this.budget = budget;
         this.travelMinutes = travelMinutes;
+        this.variation = variation == null ? 0 : Math.max(0, variation);
     }
 
     public String getCity() { return city; }
@@ -32,5 +34,6 @@ public class DecisionQuery {
     public Double getLongitude() { return longitude; }
     public Integer getBudget() { return budget; }
     public Integer getTravelMinutes() { return travelMinutes; }
+    public Integer getVariation() { return variation; }
     public boolean hasOrigin() { return latitude != null && longitude != null; }
 }
